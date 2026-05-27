@@ -40,6 +40,28 @@ if (!("ResizeObserver" in window)) {
   });
 }
 
+if (
+  !("localStorage" in window) ||
+  typeof window.localStorage.getItem !== "function"
+) {
+  const storage = new Map<string, string>();
+  Object.defineProperty(window, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: vi.fn((key: string) => storage.get(key) ?? null),
+      setItem: vi.fn((key: string, value: string) => {
+        storage.set(key, String(value));
+      }),
+      removeItem: vi.fn((key: string) => {
+        storage.delete(key);
+      }),
+      clear: vi.fn(() => {
+        storage.clear();
+      }),
+    },
+  });
+}
+
 const mockWalletKit = {
   openModal: vi.fn(),
   setWallet: vi.fn(),
@@ -66,6 +88,16 @@ vi.mock("@creit.tech/stellar-wallets-kit", () => ({
 
 vi.mock("@stellar/stellar-sdk", () => ({
   Contract: sorobanMock.Contract,
+  SorobanRpc: {
+    Server: vi.fn(function MockSorobanServer() {
+      return {
+        getAccount: vi.fn(),
+        prepareTransaction: vi.fn(),
+        sendTransaction: vi.fn(),
+        getTransaction: vi.fn(),
+      };
+    }),
+  },
   TimeoutInfinite: 0,
   nativeToScVal: sorobanMock.nativeToScVal,
   xdr: sorobanMock.xdr,

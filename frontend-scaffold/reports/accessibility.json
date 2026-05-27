@@ -1,0 +1,30 @@
+{
+  "generatedAt": "2026-05-27T11:20:07.074Z",
+  "pages": [
+    {
+      "page": "LandingPage",
+      "violations": 0,
+      "checkedAt": "2026-05-27T11:20:05.859Z"
+    },
+    {
+      "page": "ProfilePage",
+      "violations": 0,
+      "checkedAt": "2026-05-27T11:20:06.031Z"
+    },
+    {
+      "page": "TipPage",
+      "violations": 0,
+      "checkedAt": "2026-05-27T11:20:06.242Z"
+    },
+    {
+      "page": "LeaderboardPage",
+      "violations": 0,
+      "checkedAt": "2026-05-27T11:20:06.802Z"
+    },
+    {
+      "page": "DashboardPage",
+      "violations": 0,
+      "checkedAt": "2026-05-27T11:20:07.073Z"
+    }
+  ]
+}
