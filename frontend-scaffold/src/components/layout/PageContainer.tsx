@@ -4,6 +4,7 @@ interface PageContainerProps extends React.HTMLAttributes<HTMLElement> {
   children: React.ReactNode;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
+  ariaLabel?: string;
 }
 
 const PageContainer: React.FC<PageContainerProps> = ({
