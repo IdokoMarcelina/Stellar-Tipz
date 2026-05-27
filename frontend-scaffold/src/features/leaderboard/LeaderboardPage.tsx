@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import { Crown, Medal, Trophy } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -13,7 +13,7 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { useLeaderboard } from "@/hooks/useLeaderboard";
 import { categorizeError } from "@/helpers/error";
 import LeaderboardSkeleton from "./LeaderboardSkeleton";
-import LeaderboardFilters, { TimePeriod } from "./LeaderboardFilters";
+import LeaderboardFilters from "./LeaderboardFilters";
 
 
 const PAGE_SIZE = 5;
@@ -98,7 +98,7 @@ const LeaderboardPage: React.FC = () => {
             </div>
           ) : (
             <LeaderboardFilters entries={entries} loading={loading}>
-              {(filtered, period) => {
+              {(filtered) => {
                 const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
                 const safePage = Math.min(currentPage, Math.max(1, totalPages));
                 const visibleEntries = filtered.slice(

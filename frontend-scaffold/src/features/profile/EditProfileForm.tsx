@@ -11,7 +11,8 @@ import { useContract } from "@/hooks";
 import { useToastStore } from "@/store/toastStore";
 import type { Profile } from "@/types/contract";
 import type { ProfileFormData } from "@/types/profile";
-import ProfilePreview, { THEME_COLORS } from "./ProfilePreview";
+import ProfilePreview from "./ProfilePreview";
+import { THEME_COLORS } from "./profileThemes";
 
 type TxStatus =
   | "idle"
