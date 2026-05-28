@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Crown, Medal, Trophy } from "lucide-react";
+import React, { useState, useMemo } from "react";
+import { Crown, Medal, Trophy, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import PageContainer from "../../components/layout/PageContainer";
@@ -7,22 +7,52 @@ import AmountDisplay from "../../components/shared/AmountDisplay";
 import CreditBadge from "../../components/shared/CreditBadge";
 import Avatar from "../../components/ui/Avatar";
 import Card from "../../components/ui/Card";
-import Pagination from "../../components/ui/Pagination";
 import ErrorState from "../../components/shared/ErrorState";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { useLeaderboard } from "@/hooks/useLeaderboard";
+import { useContract } from "@/hooks/useContract";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { categorizeError } from "@/helpers/error";
+import { LeaderboardEntry } from "@/types/contract";
 import LeaderboardSkeleton from "./LeaderboardSkeleton";
 import LeaderboardFilters from "./LeaderboardFilters";
 
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = 20;
 
 const LeaderboardPage: React.FC = () => {
   usePageTitle('Leaderboard');
 
-  const { entries, loading, error, refetch } = useLeaderboard();
+  const { getLeaderboard } = useContract();
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Fetch function for infinite scroll
+  const fetchLeaderboardData = async (cursor?: string) => {
+    const offset = cursor ? parseInt(cursor) : 0;
+    const entries = await getLeaderboard(PAGE_SIZE + offset);
+    
+    // Simulate pagination by slicing the results
+    const startIndex = offset;
+    const endIndex = offset + PAGE_SIZE;
+    const pageEntries = entries.slice(startIndex, endIndex);
+    
+    return {
+      items: pageEntries,
+      hasMore: endIndex < entries.length,
+      nextCursor: endIndex < entries.length ? endIndex.toString() : undefined,
+    };
+  };
+
+  const {
+    items: entries,
+    loading,
+    hasMore,
+    error,
+    observerRef,
+  } = useInfiniteScroll<LeaderboardEntry>(fetchLeaderboardData);
+
+  // Top 3 entries for podium display
+  const topThree = useMemo(() => entries.slice(0, 3), [entries]);
+  const remainingEntries = useMemo(() => entries.slice(3), [entries]);
 
   const leaderboardAnnouncement = error
     ? `Leaderboard failed to load: ${categorizeError(error).message}`
@@ -53,10 +83,10 @@ const LeaderboardPage: React.FC = () => {
         <div className="grid gap-4 sm:grid-cols-3">
           {error ? (
             <div className="sm:col-span-3">
-              <ErrorState category={categorizeError(error).category} onRetry={refetch} />
+              <ErrorState category={categorizeError(error).category} onRetry={() => window.location.reload()} />
             </div>
           ) : (
-            entries.slice(0, 3).map((entry, index) => {
+            topThree.map((entry, index) => {
               const icons = [<Crown key="crown" size={18} />, <Medal key="silver" size={18} />, <Medal key="bronze" size={18} />];
               const labels = ["1st", "2nd", "3rd"];
 
@@ -97,61 +127,62 @@ const LeaderboardPage: React.FC = () => {
               <p className="font-black uppercase text-gray-800 dark:text-gray-200">No creators found on the leaderboard yet.</p>
             </div>
           ) : (
-            <LeaderboardFilters entries={entries} loading={loading}>
-              {(filtered) => {
-                const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-                const safePage = Math.min(currentPage, Math.max(1, totalPages));
-                const visibleEntries = filtered.slice(
-                  (safePage - 1) * PAGE_SIZE,
-                  safePage * PAGE_SIZE,
-                );
+            <div className="space-y-4">
+              <div className="overflow-x-auto">
+                <table className="min-w-full border-collapse">
+                  <thead>
+                    <tr className="border-b-2 border-black text-left">
+                      <th scope="col" className="px-4 py-3 text-xs font-black uppercase tracking-[0.2em]">Rank</th>
+                      <th scope="col" className="px-4 py-3 text-xs font-black uppercase tracking-[0.2em]">Creator</th>
+                      <th scope="col" className="px-4 py-3 text-xs font-black uppercase tracking-[0.2em]">Volume</th>
+                      <th scope="col" className="px-4 py-3 text-xs font-black uppercase tracking-[0.2em]">Credit</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {remainingEntries.map((entry, index) => {
+                      const rank = index + 4; // +4 because top 3 are shown separately
+                      return (
+                        <tr key={entry.address} className="border-b border-gray-300 hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-4 text-sm font-black">{rank}</td>
+                          <td className="px-4 py-4">
+                            <Link to={`/@${entry.username}`} className="flex items-center gap-3">
+                              <Avatar address={entry.address} alt={entry.username} fallback={entry.username} size="md" />
+                              <span className="font-black uppercase">{entry.username}</span>
+                            </Link>
+                          </td>
+                          <td className="px-4 py-4">
+                            <AmountDisplay amount={entry.totalTipsReceived} className="text-sm" />
+                          </td>
+                          <td className="px-4 py-4">
+                            <CreditBadge score={entry.creditScore} />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
 
-                return (
-                  <div className="space-y-4">
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full border-collapse">
-                        <thead>
-                          <tr className="border-b-2 border-black text-left">
-                            <th scope="col" className="px-4 py-3 text-xs font-black uppercase tracking-[0.2em]">Rank</th>
-                            <th scope="col" className="px-4 py-3 text-xs font-black uppercase tracking-[0.2em]">Creator</th>
-                            <th scope="col" className="px-4 py-3 text-xs font-black uppercase tracking-[0.2em]">Volume</th>
-                            <th scope="col" className="px-4 py-3 text-xs font-black uppercase tracking-[0.2em]">Credit</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {visibleEntries.map((entry, index) => {
-                            const rank = (safePage - 1) * PAGE_SIZE + index + 1;
-                            return (
-                              <tr key={entry.address} className="border-b border-gray-300 hover:bg-gray-50 transition-colors">
-                                <td className="px-4 py-4 text-sm font-black">{rank}</td>
-                                <td className="px-4 py-4">
-                                  <Link to={`/@${entry.username}`} className="flex items-center gap-3">
-                                    <Avatar address={entry.address} alt={entry.username} fallback={entry.username} size="md" />
-                                    <span className="font-black uppercase">{entry.username}</span>
-                                  </Link>
-                                </td>
-                                <td className="px-4 py-4">
-                                  <AmountDisplay amount={entry.totalTipsReceived} className="text-sm" />
-                                </td>
-                                <td className="px-4 py-4">
-                                  <CreditBadge score={entry.creditScore} />
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
+              {/* Loading indicator */}
+              {loading && (
+                <div className="flex items-center justify-center gap-2 p-8 text-gray-600">
+                  <Loader2 size={20} className="animate-spin" />
+                  <span className="text-sm font-bold uppercase">Loading more creators...</span>
+                </div>
+              )}
 
-                    <Pagination
-                      currentPage={safePage}
-                      totalPages={totalPages}
-                      onPageChange={setCurrentPage}
-                    />
-                  </div>
-                );
-              }}
-            </LeaderboardFilters>
+              {/* End of list indicator */}
+              {!hasMore && entries.length > 0 && (
+                <div className="text-center p-8 border-t-2 border-dashed border-gray-300">
+                  <p className="text-sm font-bold text-gray-600 uppercase">
+                    🎉 You've reached the end of the leaderboard!
+                  </p>
+                </div>
+              )}
+
+              {/* Intersection observer target */}
+              <div ref={observerRef} className="h-4" />
+            </div>
           )}
         </Card>
       </section>
