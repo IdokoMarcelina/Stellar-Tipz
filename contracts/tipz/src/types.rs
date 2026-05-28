@@ -333,3 +333,77 @@ pub struct RateLimitStatus {
     /// Timestamp when the current window started
     pub last_op_time: u64,
 }
+
+/// Goal tracking for creators
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct Goal {
+    /// Creator address
+    pub creator: Address,
+    /// Target amount to raise
+    pub target: i128,
+    /// Amount raised so far
+    pub raised: i128,
+    /// Goal description (max 500 chars)
+    pub description: String,
+    /// Deadline timestamp (0 = no deadline)
+    pub deadline: u64,
+    /// Whether the goal is currently active
+    pub active: bool,
+    /// Timestamp when goal was created
+    pub created_at: u64,
+    /// Timestamp when goal was reached (None = not reached yet)
+    pub reached_at: Option<u64>,
+}
+
+/// Accepted token configuration for multi-token tipping
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct AcceptedToken {
+    /// Token contract address
+    pub token_address: Address,
+    /// Oracle address for price conversion (optional)
+    pub oracle_address: Option<Address>,
+    /// Whether the token is currently enabled
+    pub enabled: bool,
+    /// Timestamp when token was added
+    pub added_at: u64,
+}
+
+/// Token balance for a creator
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct TokenBalance {
+    /// Token contract address
+    pub token_address: Address,
+    /// Balance amount
+    pub amount: i128,
+}
+
+/// Scheduled tip for future delivery
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct ScheduledTip {
+    /// Unique scheduled tip ID
+    pub id: u32,
+    /// Address of the sender
+    pub sender: Address,
+    /// Address of the creator recipient
+    pub creator: Address,
+    /// Tip amount in stroops
+    pub amount: i128,
+    /// Optional message (0-280 chars)
+    pub message: String,
+    /// Timestamp when the tip should be delivered
+    pub deliver_at: u64,
+    /// Whether the tip has been delivered
+    pub delivered: bool,
+    /// Timestamp when the tip was actually delivered (None = not delivered)
+    pub delivered_at: Option<u64>,
+    /// Whether the tip has been cancelled
+    pub cancelled: bool,
+    /// Timestamp when the tip was cancelled (None = not cancelled)
+    pub cancelled_at: Option<u64>,
+    /// Timestamp when the scheduled tip was created
+    pub created_at: u64,
+}

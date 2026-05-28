@@ -2,6 +2,7 @@
 
 mod test_admin;
 mod test_anonymous_tips;
+mod test_benchmark;
 mod test_budget;
 mod test_config;
 mod test_credit;
@@ -11,15 +12,18 @@ mod test_domain_verification;
 mod test_donation_page;
 mod test_events;
 mod test_fuzz;
+mod test_goals;
 mod test_init;
 mod test_integration;
 mod test_integration_advanced;
 mod test_leaderboard;
 mod test_min_tip;
+mod test_multitoken;
 mod test_multisig;
 mod test_pause;
 mod test_profile_query;
 mod test_profiles;
+mod test_property;
 mod test_register;
 mod test_security;
 mod test_stats;

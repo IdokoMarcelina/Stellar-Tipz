@@ -316,6 +316,11 @@ export const submitTx = async (
     }
 
     if (txResponse.status === SorobanRpc.Api.GetTransactionStatus.SUCCESS) {
+      // Any write invalidates the read cache — the only safe default is to
+      // drop balance reads for both ends of the transaction. Callers that
+      // know more (e.g. a profile update) can call additional prefix
+      // invalidations themselves.
+      contractQueryCache.invalidateByPrefix('["balance"');
       return txResponse.resultXdr.toXDR("base64");
     }
   }
@@ -330,14 +335,18 @@ export const getTokenSymbol = async (
   txBuilder: TransactionBuilder,
   server: SorobanRpc.Server,
 ) => {
-  const contract = new Contract(tokenId);
-  const tx = txBuilder
-    .addOperation(contract.call("symbol"))
-    .setTimeout(TimeoutInfinite)
-    .build();
-
-  const result = await simulateTx<string>(tx, server);
-  return result;
+  return contractQueryCache.getOrFetch(
+    buildContractCacheKey("symbol", tokenId),
+    TOKEN_METADATA_TTL_MS,
+    async () => {
+      const contract = new Contract(tokenId);
+      const tx = txBuilder
+        .addOperation(contract.call("symbol"))
+        .setTimeout(TimeoutInfinite)
+        .build();
+      return simulateTx<string>(tx, server);
+    },
+  );
 };
 
 // Get the tokens name, decoded as a string
@@ -346,14 +355,18 @@ export const getTokenName = async (
   txBuilder: TransactionBuilder,
   server: SorobanRpc.Server,
 ) => {
-  const contract = new Contract(tokenId);
-  const tx = txBuilder
-    .addOperation(contract.call("name"))
-    .setTimeout(TimeoutInfinite)
-    .build();
-
-  const result = await simulateTx<string>(tx, server);
-  return result;
+  return contractQueryCache.getOrFetch(
+    buildContractCacheKey("name", tokenId),
+    TOKEN_METADATA_TTL_MS,
+    async () => {
+      const contract = new Contract(tokenId);
+      const tx = txBuilder
+        .addOperation(contract.call("name"))
+        .setTimeout(TimeoutInfinite)
+        .build();
+      return simulateTx<string>(tx, server);
+    },
+  );
 };
 
 // Get the tokens decimals, decoded as a number
@@ -362,14 +375,18 @@ export const getTokenDecimals = async (
   txBuilder: TransactionBuilder,
   server: SorobanRpc.Server,
 ) => {
-  const contract = new Contract(tokenId);
-  const tx = txBuilder
-    .addOperation(contract.call("decimals"))
-    .setTimeout(TimeoutInfinite)
-    .build();
-
-  const result = await simulateTx<number>(tx, server);
-  return result;
+  return contractQueryCache.getOrFetch(
+    buildContractCacheKey("decimals", tokenId),
+    TOKEN_METADATA_TTL_MS,
+    async () => {
+      const contract = new Contract(tokenId);
+      const tx = txBuilder
+        .addOperation(contract.call("decimals"))
+        .setTimeout(TimeoutInfinite)
+        .build();
+      return simulateTx<number>(tx, server);
+    },
+  );
 };
 
 // Get the tokens balance, decoded as a string
@@ -379,15 +396,19 @@ export const getTokenBalance = async (
   txBuilder: TransactionBuilder,
   server: SorobanRpc.Server,
 ) => {
-  const params = [accountToScVal(address)];
-  const contract = new Contract(tokenId);
-  const tx = txBuilder
-    .addOperation(contract.call("balance", ...params))
-    .setTimeout(TimeoutInfinite)
-    .build();
-
-  const result = await simulateTx<string>(tx, server);
-  return result;
+  return contractQueryCache.getOrFetch(
+    buildContractCacheKey("balance", tokenId, address),
+    TOKEN_BALANCE_TTL_MS,
+    async () => {
+      const params = [accountToScVal(address)];
+      const contract = new Contract(tokenId);
+      const tx = txBuilder
+        .addOperation(contract.call("balance", ...params))
+        .setTimeout(TimeoutInfinite)
+        .build();
+      return simulateTx<string>(tx, server);
+    },
+  );
 };
 
 // Build a "transfer" operation, and prepare the corresponding XDR

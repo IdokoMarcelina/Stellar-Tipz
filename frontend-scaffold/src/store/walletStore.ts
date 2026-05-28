@@ -1,9 +1,15 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { secureStorage } from "../services/secureStorage";
+import type { WalletErrorType } from "../helpers/error";
 
 export type Network = 'TESTNET' | 'PUBLIC';
 type SigningStatus = 'idle' | 'signing' | 'signed' | 'error';
+
+export interface WalletError {
+  type: WalletErrorType;
+  message: string;
+}
 
 /** A single connected wallet entry. */
 export interface ConnectedWallet {
@@ -25,18 +31,21 @@ interface WalletState {
   connecting: boolean;
   isReconnecting: boolean;
   error: string | null;
+  walletError: WalletError | null;
   network: Network;
   /** walletType of the active wallet (backward-compat). */
   walletType: string | null;
   signingStatus: SigningStatus;
   _hasHydrated: boolean;
+  /** Unix timestamp (ms) when the current session expires. Null when disconnected. */
+  sessionExpiresAt: number | null;
 }
 
 interface WalletActions {
   /** Add (or activate) a wallet. If already in the list it becomes active. */
   connect: (publicKey: string, walletType?: string) => void;
   setAddress: (publicKey: string, walletType?: string) => void;
-  /** Disconnect all wallets and clear persisted state. */
+  /** Disconnect all wallets and clear all persisted session data. */
   disconnect: () => void;
   clearAddress: () => void;
   /** Remove a specific wallet from the list. */
@@ -46,11 +55,16 @@ interface WalletActions {
   setConnecting: (connecting: boolean) => void;
   setReconnecting: (isReconnecting: boolean) => void;
   setError: (error: string | null) => void;
+  setWalletError: (walletError: WalletError | null) => void;
   setNetwork: (network: Network) => void;
   setSigningStatus: (status: SigningStatus) => void;
+  /** Extend the session expiry timestamp (called on user activity). */
+  refreshSession: (timeoutMs?: number) => void;
 }
 
 type WalletStore = WalletState & WalletActions;
+
+const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
 const initialWalletState: WalletState = {
   wallets: [],
@@ -60,10 +74,12 @@ const initialWalletState: WalletState = {
   connecting: false,
   isReconnecting: false,
   error: null,
+  walletError: null,
   network: "TESTNET",
   walletType: null,
   signingStatus: "idle",
   _hasHydrated: false,
+  sessionExpiresAt: null,
 };
 
 export const useWalletStore = create<WalletStore>()(
@@ -86,7 +102,9 @@ export const useWalletStore = create<WalletStore>()(
           connecting: false,
           isReconnecting: false,
           error: null,
+          walletError: null,
           walletType: wt,
+          sessionExpiresAt: Date.now() + SESSION_TIMEOUT_MS,
         });
       },
 
@@ -101,8 +119,10 @@ export const useWalletStore = create<WalletStore>()(
           publicKey: null,
           connected: false,
           error: null,
+          walletError: null,
           walletType: null,
           signingStatus: 'idle',
+          sessionExpiresAt: null,
         }),
 
       clearAddress: () => {
@@ -143,9 +163,16 @@ export const useWalletStore = create<WalletStore>()(
 
       setError: (error: string | null) => set({ error, connecting: false, isReconnecting: false }),
 
+      setWalletError: (walletError: WalletError | null) => set({ walletError }),
+
       setNetwork: (network: Network) => set({ network }),
 
       setSigningStatus: (signingStatus: SigningStatus) => set({ signingStatus }),
+
+      refreshSession: (timeoutMs = SESSION_TIMEOUT_MS) => {
+        if (!get().connected) return;
+        set({ sessionExpiresAt: Date.now() + timeoutMs });
+      },
     }),
     {
       name: "tipz-wallet",
@@ -168,6 +195,7 @@ export const useWalletStore = create<WalletStore>()(
         network: state.network,
         publicKey: state.publicKey,
         connected: state.connected,
+        sessionExpiresAt: state.sessionExpiresAt,
       }),
     },
   ),

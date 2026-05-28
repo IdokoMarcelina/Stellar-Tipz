@@ -1,12 +1,14 @@
 export { default as AmountDisplay } from "./AmountDisplay";
 export { default as QRCode } from "./QRCode";
 export { default as CreditBadge } from "./CreditBadge";
+export { default as DataTable } from "./DataTable";
+export type { DataTableColumn, DataTableProps } from "./DataTable";
 export { default as ErrorBoundary } from "./ErrorBoundary";
 export { default as GlobalSearch } from "./GlobalSearch";
 export { default as PageTransition } from "./PageTransition";
+export { default as PullToRefresh } from "./PullToRefresh";
 export { default as ShareLink } from "./ShareLink";
 export { default as TipCard } from "./TipCard";
 export { default as TransactionStatus } from "./TransactionStatus";
 export { default as WalletConnect } from "./WalletConnect";
-export { default as WalletSwitcher } from "./WalletSwitcher";
-export { default as Breadcrumbs } from "./Breadcrumbs";
+export { default as WalletErrorRecovery } from "./WalletErrorRecovery";
