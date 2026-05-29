@@ -48,6 +48,10 @@ pub enum ContractError {
     InvalidInput = 36,
     /// Token is not in the accepted whitelist
     TokenNotAccepted = 37,
+    /// Maximum number of registered profiles reached (DoS protection)
+    MaxProfilesReached = 38,
+    /// Profile is inactive beyond the cleanup threshold
+    ProfileInactive = 39,
     /// Refund request window has expired
     RefundWindowExpired = 38,
     /// Refund has already been requested for this tip
