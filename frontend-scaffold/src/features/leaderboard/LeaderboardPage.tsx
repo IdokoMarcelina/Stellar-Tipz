@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useMemo, useEffect, useRef } from "react";
 import { Crown, Medal, Trophy, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -7,14 +7,13 @@ import AmountDisplay from "../../components/shared/AmountDisplay";
 import CreditBadge from "../../components/shared/CreditBadge";
 import Avatar from "../../components/ui/Avatar";
 import Card from "../../components/ui/Card";
+
 import ErrorState from "../../components/shared/ErrorState";
+import PullToRefresh from "../../components/shared/PullToRefresh";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { useContract } from "@/hooks/useContract";
-import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
+import { useLeaderboard } from "@/hooks/useLeaderboard";
 import { categorizeError } from "@/helpers/error";
-import { LeaderboardEntry } from "@/types/contract";
 import LeaderboardSkeleton from "./LeaderboardSkeleton";
-import LeaderboardFilters from "./LeaderboardFilters";
 
 
 const PAGE_SIZE = 20;
@@ -22,33 +21,31 @@ const PAGE_SIZE = 20;
 const LeaderboardPage: React.FC = () => {
   usePageTitle('Leaderboard');
 
-  const { getLeaderboard } = useContract();
-  const [currentPage, setCurrentPage] = useState(1);
+  const { entries, loading, hasMore, error, loadMore } = useLeaderboard(PAGE_SIZE);
+  const observerRef = useRef<HTMLDivElement>(null);
 
-  // Fetch function for infinite scroll
-  const fetchLeaderboardData = async (cursor?: string) => {
-    const offset = cursor ? parseInt(cursor) : 0;
-    const entries = await getLeaderboard(PAGE_SIZE + offset);
-    
-    // Simulate pagination by slicing the results
-    const startIndex = offset;
-    const endIndex = offset + PAGE_SIZE;
-    const pageEntries = entries.slice(startIndex, endIndex);
-    
-    return {
-      items: pageEntries,
-      hasMore: endIndex < entries.length,
-      nextCursor: endIndex < entries.length ? endIndex.toString() : undefined,
-    };
-  };
+  useEffect(() => {
+    const target = observerRef.current;
+    if (!target || !hasMore) {
+      return;
+    }
 
-  const {
-    items: entries,
-    loading,
-    hasMore,
-    error,
-    observerRef,
-  } = useInfiniteScroll<LeaderboardEntry>(fetchLeaderboardData);
+    if (typeof window === "undefined" || typeof window.IntersectionObserver === "undefined") {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (observerEntries) => {
+        if (observerEntries[0]?.isIntersecting) {
+          loadMore();
+        }
+      },
+      { threshold: 0.1 },
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [hasMore, loadMore]);
 
   // Top 3 entries for podium display
   const topThree = useMemo(() => entries.slice(0, 3), [entries]);
@@ -65,6 +62,7 @@ const LeaderboardPage: React.FC = () => {
   }
 
   return (
+    <PullToRefresh onRefresh={refetch}>
     <PageContainer maxWidth="xl" className="space-y-8 py-10">
       <section aria-labelledby="leaderboard-heading" className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
         <Card className="space-y-5 bg-yellow-100" padding="lg" hover>
@@ -99,13 +97,13 @@ const LeaderboardPage: React.FC = () => {
                     </span>
                     <CreditBadge score={entry.creditScore} showScore={false} />
                   </div>
-                  <div className="flex items-center gap-3">
+                  <Link to={`/@${entry.username}`} className="flex items-center gap-3">
                     <Avatar address={entry.address} alt={entry.username} fallback={entry.username} size="lg" />
                     <div>
                       <p className="text-lg font-black uppercase truncate max-w-[120px]">{entry.username}</p>
                       <AmountDisplay amount={entry.totalTipsReceived} className="text-sm" />
                     </div>
-                  </div>
+                  </Link>
                 </Card>
               );
             })
@@ -122,46 +120,6 @@ const LeaderboardPage: React.FC = () => {
             </Link>
           </div>
 
-          {entries.length === 0 ? (
-            <div className="text-center py-20 border-2 border-dashed border-black">
-              <p className="font-black uppercase text-gray-800 dark:text-gray-200">No creators found on the leaderboard yet.</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="overflow-x-auto">
-                <table className="min-w-full border-collapse">
-                  <thead>
-                    <tr className="border-b-2 border-black text-left">
-                      <th scope="col" className="px-4 py-3 text-xs font-black uppercase tracking-[0.2em]">Rank</th>
-                      <th scope="col" className="px-4 py-3 text-xs font-black uppercase tracking-[0.2em]">Creator</th>
-                      <th scope="col" className="px-4 py-3 text-xs font-black uppercase tracking-[0.2em]">Volume</th>
-                      <th scope="col" className="px-4 py-3 text-xs font-black uppercase tracking-[0.2em]">Credit</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {remainingEntries.map((entry, index) => {
-                      const rank = index + 4; // +4 because top 3 are shown separately
-                      return (
-                        <tr key={entry.address} className="border-b border-gray-300 hover:bg-gray-50 transition-colors">
-                          <td className="px-4 py-4 text-sm font-black">{rank}</td>
-                          <td className="px-4 py-4">
-                            <Link to={`/@${entry.username}`} className="flex items-center gap-3">
-                              <Avatar address={entry.address} alt={entry.username} fallback={entry.username} size="md" />
-                              <span className="font-black uppercase">{entry.username}</span>
-                            </Link>
-                          </td>
-                          <td className="px-4 py-4">
-                            <AmountDisplay amount={entry.totalTipsReceived} className="text-sm" />
-                          </td>
-                          <td className="px-4 py-4">
-                            <CreditBadge score={entry.creditScore} />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
 
               {/* Loading indicator */}
               {loading && (
@@ -191,6 +149,7 @@ const LeaderboardPage: React.FC = () => {
         {leaderboardAnnouncement}
       </div>
     </PageContainer>
+    </PullToRefresh>
   );
 };
 

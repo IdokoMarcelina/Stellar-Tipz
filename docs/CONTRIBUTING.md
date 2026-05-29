@@ -8,12 +8,62 @@ Thank you for your interest in contributing to **Stellar Tipz**! This guide will
 
 1. [Code of Conduct](#code-of-conduct)
 2. [Getting Started](#getting-started)
-3. [Workflow](#workflow)
-4. [Branch Naming](#branch-naming)
-5. [Commit Messages](#commit-messages)
-6. [Pull Request Process](#pull-request-process)
-7. [Code Standards](#code-standards)
-8. [Review Criteria](#review-criteria)
+3. [Branch Strategy](#branch-strategy)
+4. [Branch Protection Rules](#branch-protection-rules)
+5. [Workflow](#workflow)
+6. [Branch Naming](#branch-naming)
+7. [Commit Messages](#commit-messages)
+8. [Pull Request Process](#pull-request-process)
+9. [Code Standards](#code-standards)
+10. [Review Criteria](#review-criteria)
+
+---
+
+## Branch Strategy
+
+We use a **trunk-based** model with short-lived feature branches:
+
+| Branch | Purpose | Merges into |
+|--------|---------|-------------|
+| `main` | Production-ready code — always deployable | — |
+| `develop` | Integration branch for in-progress work | `main` (via PR) |
+| `feature/<short-description>` | New features and enhancements | `develop` or `main` |
+| `fix/<short-description>` | Bug fixes | `main` (hot-fix) or `develop` |
+| `chore/<short-description>` | Dependency updates, refactors, CI | `develop` or `main` |
+| `docs/<short-description>` | Documentation-only changes | `main` |
+
+**Rules:**
+- Never commit directly to `main` — always open a PR.
+- Keep feature branches short-lived (< 1 week ideally).
+- Rebase or squash before merge to keep `main` history linear.
+- Delete the remote branch after it is merged.
+
+---
+
+## Branch Protection Rules
+
+The `main` branch is protected with the following settings (configured in repository Settings → Branches):
+
+| Rule | Setting |
+|------|---------|
+| Require a pull request | ✅ Enabled |
+| Required approvals | 1 reviewer minimum |
+| Dismiss stale reviews on new push | ✅ Enabled |
+| Require status checks to pass | ✅ Enabled — see CI jobs below |
+| Require branches to be up to date | ✅ Enabled |
+| Require signed commits | ✅ Enabled |
+| Allow force pushes | ❌ Disabled |
+| Allow deletions | ❌ Disabled |
+| Require linear history | ✅ Enabled (rebase or squash merge only) |
+
+**Required status checks** (must pass before merge):
+
+- `frontend-ci` — lint, type-check, unit tests
+- `contract-ci` — Soroban contract build and tests
+- `pr-checks` — PR validation (title format, linked issue)
+- `security-audit` — dependency vulnerability scan
+
+The full branch protection configuration is documented in [`.github/branch-protection.json`](../.github/branch-protection.json).
 
 ---
 
@@ -252,6 +302,43 @@ PRs are evaluated on:
 - [Stellar developer docs](https://developers.stellar.org/docs)
 - [Freighter wallet](https://www.freighter.app/)
 - [Rust book](https://doc.rust-lang.org/book/) · [Conventional Commits](https://www.conventionalcommits.org/)
+
+---
+
+## Pre-commit Hooks
+
+Stellar Tipz uses [Husky](https://typicode.github.io/husky/) and [lint-staged](https://github.com/lint-staged/lint-staged) to enforce code quality before every commit. The hooks run automatically once you have installed dependencies.
+
+### What the pre-commit hook does
+
+1. **Blocks `.env` files from being staged.** Files named exactly `.env` are rejected. `.env.example` and other variant names are permitted.
+2. **Scans for secret patterns.** Any staged file containing a line that matches `PRIVATE_KEY`, `SECRET_KEY`, `API_KEY`, `ACCESS_TOKEN`, or `PASSWORD` followed by a quoted value of 8 or more characters triggers an error. Review and remove the offending line before committing.
+3. **Runs lint-staged** inside `frontend-scaffold/`, applying ESLint auto-fixes and Prettier formatting to all staged TypeScript and JavaScript source files.
+
+### Setup
+
+The hooks are installed automatically when you run `npm install` at the repo root (via the `prepare` script). If you cloned the repository without running install, or if hooks are not firing, run:
+
+```bash
+npm install
+```
+
+To verify the hook is in place:
+
+```bash
+ls -la .husky/
+# pre-commit should be listed and executable
+```
+
+### Skipping hooks (not recommended)
+
+If you need to make an emergency commit that bypasses the hooks (for example, to commit a work-in-progress without fixing lint errors first), you can use:
+
+```bash
+git commit --no-verify -m "wip: ..."
+```
+
+Use this sparingly. The CI pipeline enforces the same checks, so the branch will not be mergeable until they pass.
 
 ---
 

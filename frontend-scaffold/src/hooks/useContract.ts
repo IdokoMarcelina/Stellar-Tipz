@@ -28,10 +28,12 @@ import {
   LeaderboardEntry,
   ContractStats,
   Streak,
+  Subscription,
   getCreditTier as calculateCreditTier,
 } from "../types/contract";
 import { ProfileFormData } from "../types/profile";
 import { xlmToStroop } from "../helpers/format";
+import { logger } from '../services/logger';
 
 /**
  * Valid Stellar placeholder address used as the source account for
@@ -108,7 +110,7 @@ export const useContract = () => {
 
   // Warn once in development when contract ID is not configured
   if (!contractId) {
-    console.warn("[useContract] VITE_CONTRACT_ID is not set — contract calls will be skipped.");
+    logger.warn('[hooks/useContract]', 'VITE_CONTRACT_ID is not set — contract calls will be skipped.');
   }
 
   // --- Read-only Methods ---
@@ -664,6 +666,140 @@ export const useContract = () => {
     [contractId, wallet, server, networkDetails, withLoading],
   );
 
+  // --- Subscription Methods ---
+
+  const createSubscription = useCallback(
+    async (creator: string, amount: string, intervalDays: number): Promise<string> => {
+      const publicKey = wallet.publicKey;
+      if (!publicKey) throw new Error("Wallet not connected");
+
+      return withLoading(async () => {
+        const contract = new Contract(contractId);
+        const txBuilder = await getTxBuilder(
+          publicKey,
+          BASE_FEE,
+          server,
+          networkDetails.networkPassphrase,
+        );
+
+        const stroopAmount = xlmToStroop(amount).toString();
+
+        const tx = txBuilder
+          .addOperation(
+            contract.call(
+              "create_subscription",
+              accountToScVal(publicKey),
+              accountToScVal(creator),
+              numberToI128(safeStringToBigInt(stroopAmount)),
+              nativeToScVal(intervalDays, { type: "u32" }),
+            ),
+          )
+          .setTimeout(TimeoutInfinite)
+          .build();
+
+        const xdr = tx.toXDR();
+        const signedXdr = await wallet.signTransaction(xdr);
+        return submitTx(signedXdr, networkDetails.networkPassphrase, server);
+      });
+    },
+    [contractId, wallet, server, networkDetails, withLoading],
+  );
+
+  const cancelSubscription = useCallback(
+    async (creator: string): Promise<string> => {
+      const publicKey = wallet.publicKey;
+      if (!publicKey) throw new Error("Wallet not connected");
+
+      return withLoading(async () => {
+        const contract = new Contract(contractId);
+        const txBuilder = await getTxBuilder(
+          publicKey,
+          BASE_FEE,
+          server,
+          networkDetails.networkPassphrase,
+        );
+
+        const tx = txBuilder
+          .addOperation(
+            contract.call(
+              "cancel_subscription",
+              accountToScVal(publicKey),
+              accountToScVal(creator),
+            ),
+          )
+          .setTimeout(TimeoutInfinite)
+          .build();
+
+        const xdr = tx.toXDR();
+        const signedXdr = await wallet.signTransaction(xdr);
+        return submitTx(signedXdr, networkDetails.networkPassphrase, server);
+      });
+    },
+    [contractId, wallet, server, networkDetails, withLoading],
+  );
+
+  const executeDueSubscription = useCallback(
+    async (creator: string): Promise<string> => {
+      const publicKey = wallet.publicKey;
+      if (!publicKey) throw new Error("Wallet not connected");
+
+      return withLoading(async () => {
+        const contract = new Contract(contractId);
+        const txBuilder = await getTxBuilder(
+          publicKey,
+          BASE_FEE,
+          server,
+          networkDetails.networkPassphrase,
+        );
+
+        const tx = txBuilder
+          .addOperation(
+            contract.call(
+              "execute_due_subscription",
+              accountToScVal(publicKey),
+              accountToScVal(creator),
+            ),
+          )
+          .setTimeout(TimeoutInfinite)
+          .build();
+
+        const xdr = tx.toXDR();
+        const signedXdr = await wallet.signTransaction(xdr);
+        return submitTx(signedXdr, networkDetails.networkPassphrase, server);
+      });
+    },
+    [contractId, wallet, server, networkDetails, withLoading],
+  );
+
+  const getSubscriptions = useCallback(
+    async (subscriber: string): Promise<Subscription[]> => {
+      return withLoading(async () => {
+        const contract = new Contract(contractId);
+        const txBuilder = wallet.publicKey
+          ? await getTxBuilder(
+              wallet.publicKey,
+              BASE_FEE,
+              server,
+              networkDetails.networkPassphrase,
+            )
+          : getSimulationTxBuilder(
+              READ_ONLY_SOURCE,
+              BASE_FEE,
+              networkDetails.networkPassphrase,
+            );
+        const tx = txBuilder
+          .addOperation(
+            contract.call("get_subscriptions", accountToScVal(subscriber)),
+          )
+          .setTimeout(TimeoutInfinite)
+          .build();
+
+        return withRetry(() => simulateTx<Subscription[]>(tx, server));
+      });
+    },
+    [contractId, wallet.publicKey, server, networkDetails, withLoading, withRetry],
+  );
+
   return {
     loading,
     getProfile,
@@ -683,5 +819,9 @@ export const useContract = () => {
     sendTip,
     withdrawTips,
     deregisterProfile,
+    createSubscription,
+    cancelSubscription,
+    executeDueSubscription,
+    getSubscriptions,
   };
 };

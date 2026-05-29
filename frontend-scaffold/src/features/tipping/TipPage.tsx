@@ -19,7 +19,7 @@ import Textarea from "../../components/ui/Textarea";
 import { useWallet, useContract, useTransactionGuard } from "../../hooks";
 import ErrorState from "../../components/shared/ErrorState";
 import { categorizeError, ERRORS } from "@/helpers/error";
-import { MAX_MESSAGE_LENGTH } from "@/helpers/validation";
+import { MAX_MESSAGE_LENGTH, canTipAddress, sanitizeStellarAddress } from "@/helpers/validation";
 import { Profile } from "@/types/contract";
 import TipPageSkeleton from "./TipPageSkeleton";
 import TipAmountInput from "./TipAmountInput";
@@ -32,12 +32,14 @@ import CreatorNotFound from "./CreatorNotFound";
 import TipAmountPresets from "./TipAmountPresets";
 import TransactionTracker, { TransactionTrackerStatus } from "./TransactionTracker";
 import { useFormAutosave } from "@/hooks/useFormAutosave";
+import { logger } from '../../services/logger';
 
 const TipPage: React.FC = () => {
   const { username } = useParams<{ username: string }>();
-  const { connected, connect } = useWallet();
+  const { connected, connect, publicKey: connectedWallet } = useWallet();
   const [amount, setAmount] = useState("5");
   const [message, setMessage] = useState("");
+  const [addressError, setAddressError] = useState<string | null>(null);
   const { getProfileByUsername } = useContract();
   const [loading, setLoading] = useState(true);
   const [creator, setCreator] = useState<Profile | null>(null);
@@ -51,7 +53,7 @@ const TipPage: React.FC = () => {
       const profile = await getProfileByUsername(username);
       setCreator(profile);
     } catch (err) {
-      console.error("Failed to fetch creator:", err);
+      logger.error('features/tipping/TipPage', 'Failed to fetch creator', undefined, err instanceof Error ? err : new Error(String(err)));
       setFetchError(String(err));
     } finally {
       setLoading(false);
@@ -107,10 +109,27 @@ const TipPage: React.FC = () => {
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setAddressError(null);
+
     // Guard against submission during pending transaction
     if (isTransactionPending || step === "signing" || step === "submitting") {
       return;
     }
+
+    // Validate and sanitize the creator's wallet address before proceeding
+    const creatorAddress = creator?.owner ?? "";
+    const sanitized = sanitizeStellarAddress(creatorAddress);
+    if (!sanitized) {
+      setAddressError("Creator wallet address is invalid. Cannot send tip.");
+      return;
+    }
+
+    const tipCheck = canTipAddress(sanitized, connectedWallet ?? undefined);
+    if (!tipCheck.valid) {
+      setAddressError(tipCheck.error ?? "Cannot tip this address.");
+      return;
+    }
+
     goToConfirm(amount, message);
   };
   
@@ -280,6 +299,15 @@ const TipPage: React.FC = () => {
                 onChange={setAmount}
                 creatorAddress={creator.owner}
               />
+
+              {addressError && (
+                <div
+                  role="alert"
+                  className="border-2 border-red-600 bg-red-50 p-3 text-sm font-bold text-red-700"
+                >
+                  {addressError}
+                </div>
+              )}
 
               <Textarea
                 label="Message"
