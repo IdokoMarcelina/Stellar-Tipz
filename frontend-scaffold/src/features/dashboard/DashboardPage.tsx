@@ -28,6 +28,7 @@ import SettingsTab from "./SettingsTab";
 import TipsTab from "./TipsTab";
 import TipsChart from "./TipsChart";
 import FavoritesList from "./FavoritesList";
+import ProfileCompletion from "./ProfileCompletion";
 import { DashboardProvider } from "./DashboardContext";
 
 const DashboardPage: React.FC = () => {
@@ -246,6 +247,8 @@ const DashboardPage: React.FC = () => {
           </Button>
         </section>
       )}
+
+      <ProfileCompletion />
 
       {tips.length === 0 && creator.totalTipsCount === 0 && (
         <section
